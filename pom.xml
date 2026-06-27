@@ -14,6 +14,12 @@
             <artifactId>exificient</artifactId>
             <version>1.0.7</version>
         </dependency>
+        <dependency>
+            <groupId>org.graalvm.sdk</groupId>
+            <artifactId>nativeimage</artifactId>
+            <version>24.1.1</version>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 
     <properties>
@@ -21,5 +27,29 @@
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.graalvm.buildtools</groupId>
+                <artifactId>native-maven-plugin</artifactId>
+                <version>0.10.3</version>
+                <configuration>
+                    <imageName>libexificient</imageName>
+                    <buildArgs>
+                        <buildArg>--shared</buildArg>
+                        <buildArg>--no-fallback</buildArg>
+                    </buildArgs>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>build-native</id>
+                        <goals><goal>compile-no-fork</goal></goals>
+                        <phase>package</phase>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>
