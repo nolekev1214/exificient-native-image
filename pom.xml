@@ -51,26 +51,49 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.3.1</version>
             </plugin>
-            <plugin>
-                <groupId>org.graalvm.buildtools</groupId>
-                <artifactId>native-maven-plugin</artifactId>
-                <version>0.10.3</version>
-                <configuration>
-                    <imageName>libexificient</imageName>
-                    <buildArgs>
-                        <buildArg>--shared</buildArg>
-                        <buildArg>--no-fallback</buildArg>
-                    </buildArgs>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>build-native</id>
-                        <goals><goal>compile-no-fork</goal></goals>
-                        <phase>package</phase>
-                    </execution>
-                </executions>
-            </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>native</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <version>3.3.1</version>
+                        <configuration>
+                            <!-- Run tests with the native-image tracing agent to record all
+                                 reflective class loads, resources, and proxies used at runtime.
+                                 The generated configs are written to target/native/agent-output/main/
+                                 and picked up automatically by the native-image build below. -->
+                            <argLine>-agentlib:native-image-agent=config-output-dir=${project.build.directory}/native/agent-output/main</argLine>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <version>0.10.3</version>
+                        <configuration>
+                            <imageName>libexificient</imageName>
+                            <buildArgs>
+                                <buildArg>--shared</buildArg>
+                                <buildArg>--no-fallback</buildArg>
+                                <buildArg>-H:ConfigurationFileDirectories=${project.build.directory}/native/agent-output/main</buildArg>
+                            </buildArgs>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>build-native</id>
+                                <goals><goal>compile-no-fork</goal></goals>
+                                <phase>package</phase>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

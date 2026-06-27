@@ -1,0 +1,21 @@
+FROM ghcr.io/graalvm/native-image-community:21 AS build
+RUN microdnf install -y maven && microdnf clean all
+WORKDIR /build
+
+COPY pom.xml .
+RUN mvn -B -Pnative dependency:go-offline
+
+COPY src/ src/
+COPY schemas/ schemas/
+
+# Phase 1: run tests under the native-image tracing agent, which records all
+# reflective class loads and resource accesses into target/native/agent-output/main/.
+RUN mvn -B -Pnative test
+
+# Phase 2: build the shared library; native-image reads the agent-generated configs
+# via -H:ConfigurationFileDirectories so all Xerces/SLF4J providers are included.
+RUN mvn -B -Pnative package -DskipTests
+
+FROM scratch
+COPY --from=build /build/target/*.so /
+COPY --from=build /build/target/*.h /
