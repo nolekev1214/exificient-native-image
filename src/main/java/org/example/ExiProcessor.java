@@ -10,8 +10,9 @@ import com.siemens.ct.exi.main.api.sax.EXISource;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
-import org.xml.sax.helpers.XMLReaderFactory;
 
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParserFactory;
 import javax.xml.transform.*;
 import javax.xml.transform.sax.SAXSource;
 import javax.xml.transform.stream.StreamResult;
@@ -30,11 +31,13 @@ public class ExiProcessor {
         exiFactory.setGrammars(grammars);
     }
 
-    public ByteArrayOutputStream encode(ByteArrayInputStream xml) throws EXIException, IOException, SAXException {
+    public ByteArrayOutputStream encode(ByteArrayInputStream xml) throws EXIException, IOException, SAXException, ParserConfigurationException {
         ByteArrayOutputStream exiOut = new ByteArrayOutputStream();
         EXIResult exiResult = new EXIResult(exiFactory);
         exiResult.setOutputStream(exiOut);
-        XMLReader xmlReader = XMLReaderFactory.createXMLReader();
+        SAXParserFactory spf = SAXParserFactory.newInstance();
+        spf.setNamespaceAware(true);
+        XMLReader xmlReader = spf.newSAXParser().getXMLReader();
         xmlReader.setContentHandler(exiResult.getHandler());
         xmlReader.parse(new InputSource(xml));
         exiOut.close();
