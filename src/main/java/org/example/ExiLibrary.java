@@ -23,6 +23,19 @@ public class ExiLibrary {
         }
     }
 
+    @CEntryPoint(name = "exi_init_with_options")
+    public static int initWithOptions(IsolateThread thread,
+                                      CCharPointer optionsXml, int optionsXmlLen) {
+        try {
+            byte[] bytes = new byte[optionsXmlLen];
+            CTypeConversion.asByteBuffer(optionsXml, optionsXmlLen).get(bytes);
+            processor = new ExiProcessor(new ByteArrayInputStream(bytes));
+            return 0;
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
     // XML bytes -> EXI bytes
     @CEntryPoint(name = "exi_encode")
     public static CCharPointer encode(IsolateThread thread,
