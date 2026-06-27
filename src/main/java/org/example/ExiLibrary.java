@@ -29,8 +29,9 @@ public class ExiLibrary {
                                       CCharPointer input, int inputLen,
                                       CIntPointer outputLen) {
         try {
-            byte[] in = CTypeConversion.asByteBuffer(input, inputLen).array();
-            byte[] out = processor.decode(new ByteArrayInputStream(in)).toByteArray();
+            byte[] in = new byte[inputLen];
+            CTypeConversion.asByteBuffer(input, inputLen).get(in);
+            byte[] out = processor.encode(new ByteArrayInputStream(in)).toByteArray();
             outputLen.write(out.length);
             CCharPointer result = UnmanagedMemory.malloc(out.length);
             CTypeConversion.asByteBuffer(result, out.length).put(out);
@@ -47,8 +48,9 @@ public class ExiLibrary {
                                       CCharPointer input, int inputLen,
                                       CIntPointer outputLen) {
         try {
-            byte[] in = CTypeConversion.asByteBuffer(input, inputLen).array();
-            byte[] out = processor.encode(new ByteArrayInputStream(in)).toByteArray();
+            byte[] in = new byte[inputLen];
+            CTypeConversion.asByteBuffer(input, inputLen).get(in);
+            byte[] out = processor.decode(new ByteArrayInputStream(in)).toByteArray();
             outputLen.write(out.length);
             CCharPointer result = UnmanagedMemory.malloc(out.length);
             CTypeConversion.asByteBuffer(result, out.length).put(out);
