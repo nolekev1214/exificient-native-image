@@ -30,19 +30,19 @@ public class ExiProcessor {
         exiFactory.setGrammars(grammars);
     }
 
-    public ByteArrayOutputStream decode(ByteArrayInputStream xml) throws EXIException, IOException, SAXException {
+    public ByteArrayOutputStream encode(ByteArrayInputStream xml) throws EXIException, IOException, SAXException {
         ByteArrayOutputStream exiOut = new ByteArrayOutputStream();
         EXIResult exiResult = new EXIResult(exiFactory);
         exiResult.setOutputStream(exiOut);
         XMLReader xmlReader = XMLReaderFactory.createXMLReader();
         xmlReader.setContentHandler(exiResult.getHandler());
-        xmlReader.parse(xml.toString());
+        xmlReader.parse(new InputSource(xml));
         exiOut.close();
 
         return exiOut;
     }
 
-    public ByteArrayOutputStream encode(ByteArrayInputStream exi) throws EXIException, TransformerException {
+    public ByteArrayOutputStream decode(ByteArrayInputStream exi) throws EXIException, TransformerException {
         ByteArrayOutputStream xmlOut = new ByteArrayOutputStream();
         Result result = new StreamResult(xmlOut);
         SAXSource exiSource = new EXISource(exiFactory);
