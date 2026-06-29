@@ -106,15 +106,21 @@ informs the EXI grammar on both ends, so the encoder and decoder must use the
 same schema.
 
 The schema is parsed from disk at runtime (it is **not** compiled into the
-`.so`), so pointing at a different schema works without rebuilding — this is
-verified with an unrelated schema, not just the bundled one. The one caveat is
-GraalVM's closed-world model: the native build only registers the
-reflection/resource config exercised while parsing schemas during the
-tracing-agent phase. That covers the Xerces parser machinery and common XSD
-datatypes, so typical schemas load fine; a schema using an exotic XSD construct
-never exercised at build time could fail to load and require re-running Phase 1
-(`mvn -Pnative test`) before rebuilding. To guarantee coverage for a specific
-schema, parse it during that phase.
+`.so`), so pointing at a different schema works without rebuilding. XSD parsing
+runs through Xerces' fixed, compiled code path — schema *content* does not load
+construct-specific classes — so this holds across schemas regardless of the
+constructs they use. Verified with both an unrelated schema and a construct-heavy
+one (patterns, unions, lists, abstract types, nillable elements, `xs:ID`, and
+datatypes from `dateTime` to `base64Binary`), all loading through the shipped
+`.so` with no rebuild.
+
+The only thing to be aware of is GraalVM's closed-world model: just the
+reflection/resource paths exercised during the tracing-agent phase
+(`mvn -Pnative test`) are available at runtime. The XSD parser machinery is
+schema-independent and is covered, so standard, valid schemas load. The narrow
+residual risk is some unrelated code branch the build never exercised (e.g. an
+error-reporting path) — not XSD constructs; if one ever surfaces, add that
+scenario to the Phase-1 run and rebuild.
 
 ## Consuming via Conan
 
