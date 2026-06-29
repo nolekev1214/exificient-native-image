@@ -124,27 +124,60 @@ scenario to the Phase-1 run and rebuild.
 
 ## Consuming via Conan
 
-CI publishes a prebuilt Conan 2 package (library + headers; **schemas are not
-packaged** — supply your own per the section above). Download the
-`conan-exificient-linux-<arch>` artifact from a `build` workflow run, then:
+The `build` workflow publishes a prebuilt **Conan 2** package per architecture
+(library + headers — **schemas are not packaged**; you supply your own, see
+above). There is no Conan remote: the package is distributed as a CI artifact and
+imported into your local cache.
+
+**1. Restore the package into your local Conan cache.** Download
+`conan-exificient-linux-<arch>` from a successful `build` run, then:
 
 ```sh
-# 1. Restore the CI-built package into your local Conan cache
 conan cache restore conan-exificient-<arch>.tgz
-
-# 2. Require it from your conanfile
-#    [requires]
-#    exificient/<version>
-#
-#    [generators]
-#    CMakeDeps
-#    CMakeToolchain
-
-# 3. In CMakeLists.txt
-#    find_package(exificient CONFIG REQUIRED)
-#    target_link_libraries(your_app PRIVATE exificient::exificient)
+conan list "exificient/*"        # shows the version you just restored
 ```
 
-The package is keyed on `os`+`arch` only (C ABI), so one binary works across
-compilers. A complete worked example lives on the `demo/entity-exi-compression`
-branch (`examples/entity_demo`).
+The version tracks the build: `0.0.0-ci` for branch/PR builds, or the tag (e.g.
+`0.1.0`) for tagged releases.
+
+**2. Require it.** In your consumer `conanfile.txt` (use the version from step 1):
+
+```ini
+[requires]
+exificient/0.0.0-ci
+
+[generators]
+CMakeDeps
+CMakeToolchain
+VirtualRunEnv
+```
+
+**3. Link it.** In `CMakeLists.txt`:
+
+```cmake
+find_package(exificient CONFIG REQUIRED)
+target_link_libraries(your_app PRIVATE exificient::exificient)
+```
+
+**4. Build:**
+
+```sh
+conan install . --output-folder=build --build=missing
+cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$PWD/build/conan_toolchain.cmake" -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
+**5. Run.** `libexificient` is a shared library, so it must be on the loader path
+at runtime, and the schemas must be reachable (see *Runtime Requirement* above).
+The generated `VirtualRunEnv` script handles the loader path:
+
+```sh
+source build/conanrun.sh                 # puts the package's lib dir on LD_LIBRARY_PATH
+cp -r /path/to/your/schemas ./schemas    # or: export EXIFICIENT_SCHEMA=/path/to/your.xsd
+./build/your_app
+```
+
+The package is keyed on `os`+`arch` only (the C ABI is compiler-independent), so
+one binary works across compilers and build types. A complete worked example —
+using a `conanfile.py` consumer recipe — lives on the
+`demo/entity-exi-compression` branch under `examples/entity_demo`.
