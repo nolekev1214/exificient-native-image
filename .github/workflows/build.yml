@@ -218,18 +218,25 @@ jobs:
         with:
           path: dist
 
-      - name: Zip per-arch artifacts
+      - name: Assemble release assets (OS- and version-qualified names)
         run: |
           cd dist
-          for d in libexificient-*; do
-            (cd "$d" && zip -r "../${d}.zip" .)
+          ver="${GITHUB_REF_NAME#v}"
+          mkdir -p out
+          # Raw binary bundle per platform: libexificient-<ver>-<os>-<arch>.zip
+          # (the artifact dir name already carries <os>-<arch>).
+          for d in libexificient-*/; do
+            d="${d%/}"; suffix="${d#libexificient-}"
+            (cd "$d" && zip -r "../out/libexificient-${ver}-${suffix}.zip" .)
           done
+          # Prebuilt Conan package per platform: conan-exificient-<ver>-<os>-<arch>.tgz
+          for d in conan-exificient-*/; do
+            d="${d%/}"; suffix="${d#conan-exificient-}"
+            cp "$d"/*.tgz "out/conan-exificient-${ver}-${suffix}.tgz"
+          done
+          ls -l out
 
       - name: Publish release
         uses: softprops/action-gh-release@7c4723f7a335432393329f8f1c564994ce50185d # v3
         with:
-          # Per-arch raw binary zips plus the prebuilt Conan packages (.tgz, ready
-          # for `conan cache restore`).
-          files: |
-            dist/*.zip
-            dist/conan-exificient-*/*.tgz
+          files: dist/out/*
