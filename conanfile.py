@@ -26,10 +26,10 @@ class ExificientConan(ConanFile):
     # the directory holding libexificient.so, the generated headers, and schemas/,
     # then runs `conan export-pkg`.
     def validate(self):
-        if self.settings.os != "Linux":
+        if self.settings.os not in ("Linux", "Windows"):
             raise ConanInvalidConfiguration(
-                "Only Linux is currently packaged (x86_64, armv8). "
-                "Windows/macOS artifacts are not yet produced."
+                "Only Linux (x86_64, armv8) and Windows (x86_64) are packaged; "
+                "macOS artifacts are not yet produced."
             )
 
     def package(self):
@@ -44,16 +44,26 @@ class ExificientConan(ConanFile):
         # ./schemas at runtime so a consumer can supply their own (see README), so
         # bundling a specific schema here would couple the package to one schema
         # version and bloat it.
-        copy(self, "*.so", prebuilt, os.path.join(self.package_folder, "lib"))
+        if self.settings.os == "Windows":
+            # DLL goes in bin/, the MSVC import library in lib/.
+            copy(self, "*.dll", prebuilt, os.path.join(self.package_folder, "bin"))
+            copy(self, "*.lib", prebuilt, os.path.join(self.package_folder, "lib"))
+        else:
+            copy(self, "*.so", prebuilt, os.path.join(self.package_folder, "lib"))
         copy(self, "*.h", prebuilt, os.path.join(self.package_folder, "include"))
-        # Ship license notices: the .so embeds MIT-licensed EXIficient.
+        # Ship license notices: the binary embeds MIT-licensed EXIficient.
         licenses = os.path.join(self.package_folder, "licenses")
         copy(self, "THIRD_PARTY_NOTICES.txt", self.recipe_folder, licenses)
         copy(self, "LICENSE", self.recipe_folder, licenses)
 
     def package_info(self):
-        # libexificient.so -> link name "exificient"
-        self.cpp_info.libs = ["exificient"]
+        # Link name: libexificient.so -> "exificient" (ELF). On Windows the MSVC
+        # import library is libexificient.lib -> "libexificient".
+        if self.settings.os == "Windows":
+            self.cpp_info.libs = ["libexificient"]
+            self.cpp_info.bindirs = ["bin"]
+        else:
+            self.cpp_info.libs = ["exificient"]
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.libdirs = ["lib"]
         # No schemas are packaged: at runtime the library reads ./schemas relative
