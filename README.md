@@ -129,8 +129,9 @@ The `build` workflow publishes a prebuilt **Conan 2** package per architecture
 above). There is no Conan remote: the package is distributed as a CI artifact and
 imported into your local cache.
 
-**1. Restore the package into your local Conan cache.** Download
-`conan-exificient-linux-<arch>` from a successful `build` run, then:
+**1. Restore the package into your local Conan cache.** Download the artifact for
+your platform from a successful `build` run — `conan-exificient-linux-<arch>`
+(x86_64 / arm64) or `conan-exificient-windows-x86_64` — then:
 
 ```sh
 conan cache restore conan-exificient-<arch>.tgz
@@ -159,10 +160,14 @@ find_package(exificient CONFIG REQUIRED)
 target_link_libraries(your_app PRIVATE exificient::exificient)
 ```
 
-**4. Build:**
+**4. Build.** `exificient` is a prebuilt binary package, so `conan install` simply
+uses the binary you restored in step 1. Don't pass `--build=missing` — the package
+cannot be built from source, and that flag would make Conan try (and fail) instead
+of reporting a clean "missing binary" if the restore was skipped or the
+platform/arch doesn't match.
 
 ```sh
-conan install . --output-folder=build --build=missing
+conan install . --output-folder=build
 cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$PWD/build/conan_toolchain.cmake" -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
