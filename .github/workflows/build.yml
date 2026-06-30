@@ -27,8 +27,11 @@ jobs:
       - name: Build libexificient.so
         run: docker build -f Dockerfile.build -o "out/${{ matrix.arch }}" .
 
-      - name: Stage schemas alongside the artifact
-        run: cp -r schemas "out/${{ matrix.arch }}/schemas"
+      - name: Stage schemas and license notices alongside the artifact
+        run: |
+          cp -r schemas "out/${{ matrix.arch }}/schemas"
+          # The .so embeds MIT-licensed EXIficient; ship the notices with it.
+          cp THIRD_PARTY_NOTICES.txt LICENSE "out/${{ matrix.arch }}/"
 
       - name: Upload artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -88,6 +91,11 @@ jobs:
       - name: Test the packaged library links and loads
         run: conan test test_package "exificient/${{ steps.ver.outputs.version }}"
 
+      - name: Smoke test (functional — asserts compression works)
+        env:
+          EXIFICIENT_SCHEMA: ${{ github.workspace }}/schemas/UCI_MessageDefinitions_v2_5_0.xsd
+        run: conan test smoke "exificient/${{ steps.ver.outputs.version }}"
+
       - name: Save the Conan package as a portable artifact
         run: |
           # Archive the recipe + binary into a tarball that any machine can pull
@@ -102,11 +110,106 @@ jobs:
           path: conan-exificient-${{ matrix.arch }}.tgz
           if-no-files-found: error
 
+  # Windows native DLL. No Docker (those are Linux containers); GraalVM Native
+  # Image needs the MSVC toolchain, so this runs on a native windows runner with
+  # the MSVC environment configured by setup-graalvm.
+  build-windows:
+    name: build-windows-x86_64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - uses: graalvm/setup-graalvm@6f3fa030c4b8f77c1f554a860f593a654538fa38 # v1.5.6
+        with:
+          java-version: "21"
+          distribution: "graalvm-community"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Two-phase build as separate steps so each phase's exit code is checked.
+      - name: Phase 1 - tracing agent (mvn -Pnative test)
+        run: mvn -B -Pnative test
+
+      - name: Phase 2 - build shared library (mvn -Pnative package)
+        run: mvn -B -Pnative package -DskipTests
+
+      - name: Stage DLL, import lib, headers, schemas and notices
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path out/windows-x86_64 | Out-Null
+          Copy-Item target/libexificient.dll out/windows-x86_64/
+          Copy-Item target/libexificient.lib out/windows-x86_64/
+          Copy-Item target/*.h out/windows-x86_64/
+          Copy-Item -Recurse schemas out/windows-x86_64/schemas
+          Copy-Item THIRD_PARTY_NOTICES.txt out/windows-x86_64/
+          Copy-Item LICENSE out/windows-x86_64/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: libexificient-windows-x86_64
+          path: out/windows-x86_64/*
+          if-no-files-found: error
+
+  # Validate the Conan recipe against the Windows binary on a native MSVC runner.
+  conan-package-windows:
+    name: conan-package-windows-x86_64
+    needs: build-windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: libexificient-windows-x86_64
+          path: prebuilt
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Conan
+        run: pip install "conan>=2.0"
+
+      - name: Compute package version
+        id: ver
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-ci" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Package prebuilt binary with Conan
+        env:
+          EXIFICIENT_PREBUILT_DIR: ${{ github.workspace }}/prebuilt
+        run: |
+          conan profile detect --force
+          conan export-pkg . --version "${{ steps.ver.outputs.version }}"
+
+      - name: Test the packaged library links and loads
+        run: conan test test_package "exificient/${{ steps.ver.outputs.version }}"
+
+      - name: Smoke test (functional — asserts compression works)
+        env:
+          EXIFICIENT_SCHEMA: ${{ github.workspace }}/schemas/UCI_MessageDefinitions_v2_5_0.xsd
+        run: conan test smoke "exificient/${{ steps.ver.outputs.version }}"
+
+      - name: Save the Conan package as a portable artifact
+        run: conan cache save "exificient/${{ steps.ver.outputs.version }}:*" --file "conan-exificient-windows-x86_64.tgz"
+
+      - name: Upload Conan package artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: conan-exificient-windows-x86_64
+          path: conan-exificient-windows-x86_64.tgz
+          if-no-files-found: error
+
   # On a version tag, bundle every arch artifact into a single GitHub Release so
   # the Conan recipe (and manual consumers) can download per-arch binaries.
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-linux, conan-package]
+    needs: [build-linux, conan-package, build-windows, conan-package-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -115,14 +218,25 @@ jobs:
         with:
           path: dist
 
-      - name: Zip per-arch artifacts
+      - name: Assemble release assets (OS- and version-qualified names)
         run: |
           cd dist
-          for d in libexificient-*; do
-            (cd "$d" && zip -r "../${d}.zip" .)
+          ver="${GITHUB_REF_NAME#v}"
+          mkdir -p out
+          # Raw binary bundle per platform: libexificient-<ver>-<os>-<arch>.zip
+          # (the artifact dir name already carries <os>-<arch>).
+          for d in libexificient-*/; do
+            d="${d%/}"; suffix="${d#libexificient-}"
+            (cd "$d" && zip -r "../out/libexificient-${ver}-${suffix}.zip" .)
           done
+          # Prebuilt Conan package per platform: conan-exificient-<ver>-<os>-<arch>.tgz
+          for d in conan-exificient-*/; do
+            d="${d%/}"; suffix="${d#conan-exificient-}"
+            cp "$d"/*.tgz "out/conan-exificient-${ver}-${suffix}.tgz"
+          done
+          ls -l out
 
       - name: Publish release
         uses: softprops/action-gh-release@7c4723f7a335432393329f8f1c564994ce50185d # v3
         with:
-          files: dist/*.zip
+          files: dist/out/*
