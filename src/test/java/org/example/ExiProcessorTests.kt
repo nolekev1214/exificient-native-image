@@ -31,16 +31,13 @@ class ExiProcessorTests {
         val transformer = TransformerFactory
             .newInstance()
             .newTransformer()
-
         transformer.setOutputProperty(OutputKeys.INDENT, "yes")
-        transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4")
 
         val writer = StringWriter()
         transformer.transform(
             DOMSource(document),
             StreamResult(writer)
         )
-
         return writer.toString()
     }
 
