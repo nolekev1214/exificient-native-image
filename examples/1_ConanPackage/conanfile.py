@@ -9,7 +9,7 @@ class SmokeConan(ConanFile):
     """Functional smoke test: builds smoke.cpp against the exificient package and
     runs it on a known-good XML, asserting that compression actually works.
 
-    Run with: conan test smoke exificient/<version>
+    Run with: conan test examples/1_ConanPackage exificient/<version>
     (set EXIFICIENT_SCHEMA so exi_init can find a schema).
     """
 
