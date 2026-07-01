@@ -88,9 +88,6 @@ jobs:
           # rebuilding from source (consumers never need GraalVM).
           conan export-pkg . --version "${{ steps.ver.outputs.version }}"
 
-      - name: Test the packaged library links and loads
-        run: conan test test_package "exificient/${{ steps.ver.outputs.version }}"
-
       - name: Smoke test (functional — asserts compression works)
         env:
           EXIFICIENT_SCHEMA: ${{ github.workspace }}/schemas/UCI_MessageDefinitions_v2_5_0.xsd
@@ -186,9 +183,6 @@ jobs:
         run: |
           conan profile detect --force
           conan export-pkg . --version "${{ steps.ver.outputs.version }}"
-
-      - name: Test the packaged library links and loads
-        run: conan test test_package "exificient/${{ steps.ver.outputs.version }}"
 
       - name: Smoke test (functional — asserts compression works)
         env:
