@@ -26,6 +26,7 @@ public class ExiLibrary {
     @CEntryPoint(name = "exi_init_with_options")
     public static int initWithOptions(IsolateThread thread, ExiOptions options) {
         try {
+            String schemaPath = CTypeConversion.toJavaString(options.schema_path());
             // TODO actually use the option
             processor = new ExiProcessor();
             return 0;
