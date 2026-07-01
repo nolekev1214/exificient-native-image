@@ -88,13 +88,10 @@ jobs:
           # rebuilding from source (consumers never need GraalVM).
           conan export-pkg . --version "${{ steps.ver.outputs.version }}"
 
-      - name: Test the packaged library links and loads
-        run: conan test test_package "exificient/${{ steps.ver.outputs.version }}"
-
       - name: Smoke test (functional — asserts compression works)
         env:
           EXIFICIENT_SCHEMA: ${{ github.workspace }}/schemas/UCI_MessageDefinitions_v2_5_0.xsd
-        run: conan test smoke "exificient/${{ steps.ver.outputs.version }}"
+        run: conan test examples/1_ConanPackage "exificient/${{ steps.ver.outputs.version }}"
 
       - name: Save the Conan package as a portable artifact
         run: |
@@ -187,13 +184,10 @@ jobs:
           conan profile detect --force
           conan export-pkg . --version "${{ steps.ver.outputs.version }}"
 
-      - name: Test the packaged library links and loads
-        run: conan test test_package "exificient/${{ steps.ver.outputs.version }}"
-
       - name: Smoke test (functional — asserts compression works)
         env:
           EXIFICIENT_SCHEMA: ${{ github.workspace }}/schemas/UCI_MessageDefinitions_v2_5_0.xsd
-        run: conan test smoke "exificient/${{ steps.ver.outputs.version }}"
+        run: conan test examples/1_ConanPackage "exificient/${{ steps.ver.outputs.version }}"
 
       - name: Save the Conan package as a portable artifact
         run: conan cache save "exificient/${{ steps.ver.outputs.version }}:*" --file "conan-exificient-windows-x86_64.tgz"
