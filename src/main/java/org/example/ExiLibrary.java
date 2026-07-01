@@ -23,6 +23,17 @@ public class ExiLibrary {
         }
     }
 
+    @CEntryPoint(name = "exi_init_with_options")
+    public static int initWithOptions(IsolateThread thread, ExiOptions options) {
+        try {
+            // TODO actually use the option
+            processor = new ExiProcessor();
+            return 0;
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
     // XML bytes -> EXI bytes
     @CEntryPoint(name = "exi_encode")
     public static CCharPointer encode(IsolateThread thread,
